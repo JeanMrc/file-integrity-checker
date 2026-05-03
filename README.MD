@@ -66,3 +66,9 @@ files to appear innocent.
 - Audit trail for compliance requirements
 - Intrusion detection on critical systems
 - SOC analyst tooling
+
+---
+
+## Known Limitations
+- Requires manual restart if monitored folder is deleted
+- Does not monitor subfolders (recursive=False)
