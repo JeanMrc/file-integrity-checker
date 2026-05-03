@@ -57,6 +57,51 @@ def load_database():
     return hashes
 
 # -- Check Integrity -- 
+class IntegrityHandler(FileSystemEventHandler):
+    def __init__(self, known_hashes):
+        self.known_hashes = known_hashes
+
+    def on_modified(self, event):
+        if not event.is_directory:
+            filepath = event.src_path
+            filename = os.path.basename(filepath)
+            current_hash = hash_file(filepath)
+            known_hash   = self.known_hashes.get(filepath)
+
+            if known_hash and current_hash != known_hash:
+                msg = f"[MODIFIED] {filename}"
+                print(msg)
+                logging.warning(msg)
+                self.known_hashes[filepath] = current_hash
+
+    def on_deleted(self, event):
+        if not event.is_directory:
+            filename = os.path.basename(event.src_path)
+            msg = f"[DELETED]  {filename}"
+            print(msg)
+            logging.warning(msg)
+            self.known_hashes.pop(event.src_path, None)
+
+    def on_created(self, event):
+        if not event.is_directory:
+            filepath = event.src_path
+            filename = os.path.basename(filepath)
+            msg = f"[NEW FILE] {filename}"
+            print(msg)
+            logging.warning(msg)
+            self.known_hashes[filepath] = hash_file(filepath)
+
+    def on_moved(self, event):
+        if not event.is_directory:
+            old_name = os.path.basename(event.src_path)
+            new_name = os.path.basename(event.dest_path)
+            msg = f"[RENAMED]  {old_name} -> {new_name}"
+            print(msg)
+            logging.warning(msg)
+            old_hash = self.known_hashes.pop(event.src_path, None)
+            if old_hash:
+                self.known_hashes[event.dest_path] = old_hash
+
 def check_integrity(known_hashes):
     changes= []
 
@@ -98,14 +143,24 @@ def run_checker():
     print("=" * 50)
 
     known_hashes = load_database()
-
     print(f"Watching {len(known_hashes)} files for changes...")
     print("-" * 50)
 
-    while True:
-        time.sleep(10)
-        check_integrity(known_hashes)
+    event_handler = IntegrityHandler(known_hashes)
+    observer      = Observer()
+    observer.schedule(event_handler, path=WATCH_DIR, recursive=False)
+    observer.start()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+        print("\nStopped.")
+        logging.info("Integrity checker stopped.")
+
+    observer.join()
 
 
-#-- Run -- 
-run_checker() 
+# -- Run --
+run_checker()
