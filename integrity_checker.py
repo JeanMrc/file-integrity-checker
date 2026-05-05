@@ -85,11 +85,15 @@ class IntegrityHandler(FileSystemEventHandler):
     def on_created(self, event):
         if not event.is_directory:
             filepath = event.src_path
-            filename = os.path.basename(filepath)
-            msg = f"[NEW FILE] {filename}"
-            print(msg)
-            logging.warning(msg)
+        filename = os.path.basename(filepath)
+        msg = f"[NEW FILE] {filename}"
+        print(msg)
+        logging.warning(msg)
+        time.sleep(1)
+        try:
             self.known_hashes[filepath] = hash_file(filepath)
+        except PermissionError:
+            print(f"[WARNING] Could not hash {filename} — file locked.")
 
     def on_moved(self, event):
         if not event.is_directory:
